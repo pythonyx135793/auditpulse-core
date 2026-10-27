@@ -67,7 +67,13 @@ never any cross-file dataflow. Known consequences:
   `require_auth` only gates sensitive operations that appear after it, so a
   check placed too late still produces a finding. It does not reason across
   functions — a `require_auth` inside a helper does not gate the caller and
-  such a helper-based boundary is reported as unprotected.
+  such a helper-based boundary is reported as unprotected. Calls to a
+  `macro_rules!` macro defined in the same file whose body calls
+  `require_auth`/`require_auth_for_args` do count as an auth check (matched by
+  name with brace matching, no expansion).
+* `AP-STORAGE-001` is a file-level text match for `extend_ttl`; it does not
+  check temporary vs persistent kind, and does not expand macros, so a TTL
+  macro that is merely defined satisfies it.
 * `AP-CALL-001` judges validation positionally within a single function:
   only evidence appearing before the sensitive call can gate it, and only
   explicit checks (`assert!`/`require!` or a comparison on the id) count as

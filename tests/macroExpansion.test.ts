@@ -26,8 +26,39 @@ describe("contracts/MacroExpandedVault.rs", () => {
     expect(auth.map((f) => f.location.function)).toEqual(["leak"]);
   });
 
-  it("accepts TTL management done through a local macro", () => {
+  it("reports no storage finding for the sample (file-level extend_ttl text match)", () => {
     expect(findings.map((f) => f.id)).not.toContain("AP-STORAGE-001");
+  });
+});
+
+describe("AP-STORAGE-001 temporary vs persistent TTL (file-level)", () => {
+  const storageIds = (code: string) => scan(code).filter((f) => f.id === "AP-STORAGE-001");
+  const wrap = (body: string, pre = "") => `
+    ${pre}
+    #[contractimpl]
+    impl C {
+        pub fn f(env: Env, k: u32) {
+            ${body}
+        }
+    }
+  `;
+  const tmpMacro = "macro_rules! bump { ($e:expr, $k:expr) => { $e.storage().temporary().extend_ttl($k, 10, 20); }; }";
+
+  it("temporary set with a temporary extend_ttl macro gives no finding", () => {
+    expect(storageIds(wrap("env.storage().temporary().set(&k, &1); bump!(env, &k);", tmpMacro))).toEqual([]);
+  });
+
+  it("detects extend_ttl at file level only, regardless of storage kind", () => {
+    expect(storageIds(wrap("env.storage().persistent().set(&k, &1); env.storage().temporary().extend_ttl(&k, 1, 2);"))).toEqual([]);
+    expect(storageIds(wrap("env.storage().temporary().set(&k, &1); env.storage().persistent().extend_ttl(&k, 1, 2);"))).toEqual([]);
+  });
+
+  it("reports exactly one finding when no extend_ttl exists anywhere", () => {
+    expect(storageIds(wrap("env.storage().temporary().set(&k, &1); env.storage().persistent().set(&k, &2);"))).toHaveLength(1);
+  });
+
+  it("a defined but never invoked TTL macro still suppresses the finding (text-match limitation)", () => {
+    expect(storageIds(wrap("env.storage().temporary().set(&k, &1);", tmpMacro))).toEqual([]);
   });
 });
 
