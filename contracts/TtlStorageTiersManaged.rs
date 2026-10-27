@@ -18,6 +18,7 @@ pub enum Error {
 pub enum DataKey {
     Balance(Address),
     Allowance(Address, Address),
+    Nonce(Address),
 }
 
 #[contract]
@@ -53,5 +54,14 @@ impl TtlStorageTiersManaged {
         let key = DataKey::Allowance(owner, spender);
         env.storage().temporary().set(&key, &amount);
         env.storage().temporary().extend_ttl(&key, 100, 200);
+    }
+
+    pub fn bump_nonce(env: Env, owner: Address) -> u32 {
+        owner.require_auth();
+        let key = DataKey::Nonce(owner);
+        let next: u32 = env.storage().instance().get(&key).unwrap_or(0).saturating_add(1);
+        env.storage().instance().set(&key, &next);
+        env.storage().instance().extend_ttl(LEDGER_THRESHOLD, LEDGER_BUMP);
+        next
     }
 }
