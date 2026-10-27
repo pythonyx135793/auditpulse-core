@@ -1,5 +1,5 @@
-//! Managed counterpart of `TtlStorageTiers.rs`: every storage tier is bumped
-//! with extend_ttl / extend_ttl_to_threshold, writers call require_auth, and
+//! Managed counterpart of `TtlStorageTiers.rs`: persistent and temporary
+//! entries are bumped with extend_ttl, writers call require_auth, and
 //! expired reads return an error instead of unwrapping. The scanner should
 //! report no findings.
 
@@ -41,7 +41,7 @@ impl TtlStorageTiersManaged {
             Some(v) => {
                 env.storage()
                     .persistent()
-                    .extend_ttl_to_threshold(&key, LEDGER_THRESHOLD, LEDGER_BUMP);
+                    .extend_ttl(&key, LEDGER_THRESHOLD, LEDGER_BUMP);
                 Ok(v)
             }
             None => Err(Error::Expired),
