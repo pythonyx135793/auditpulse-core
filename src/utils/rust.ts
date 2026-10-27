@@ -159,6 +159,30 @@ export function extractRustFunctions(code: string): ScannedFunction[] {
   return fns;
 }
 
+/**
+ * Names of `macro_rules!` macros defined in `code` whose body calls
+ * `pattern`. Invoking such a macro expands to that call, so rules treat
+ * `name!(...)` as if the call were written inline. Brace matching only; the
+ * macro internals are not parsed.
+ */
+export function macrosContaining(code: string, pattern: RegExp): string[] {
+  const clean = sanitizeKeepLines(code);
+  const names: string[] = [];
+  const header = /macro_rules!\s*([A-Za-z_]\w*)\s*\{/g;
+  for (let m = header.exec(clean); m; m = header.exec(clean)) {
+    let depth = 1;
+    let i = header.lastIndex;
+    for (; i < clean.length && depth > 0; i++) {
+      if (clean[i] === "{") depth++;
+      else if (clean[i] === "}") depth--;
+    }
+    if (pattern.test(clean.slice(header.lastIndex, i))) {
+      names.push(m[1] ?? "");
+    }
+  }
+  return names;
+}
+
 /** Finds the 1-based line of the first regex match, or null when absent. */
 export function findFirstMatchLine(
   lines: string[],

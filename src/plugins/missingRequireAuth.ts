@@ -1,6 +1,6 @@
 import type { Rule, ScannedFunction, Vulnerability } from "../types";
 import type { FunctionRule } from "../engine.js";
-import { extractRustFunctions, functionLocation, sanitizeKeepLines } from "../utils/rust.js";
+import { extractRustFunctions, functionLocation, macrosContaining, sanitizeKeepLines } from "../utils/rust.js";
 
 /**
  * Authorization-sensitive operations (token transfers, balance updates,
@@ -20,7 +20,7 @@ export class MissingRequireAuthPlugin implements Rule, FunctionRule {
 
   scan(code: string): Vulnerability[] {
     return extractRustFunctions(sanitizeKeepLines(code)).flatMap((fn) =>
-      this.scanFunction(fn),
+      this.scanFunction(fn, code),
     );
   }
 
@@ -38,7 +38,7 @@ export class MissingRequireAuthPlugin implements Rule, FunctionRule {
    * callee is invisible here, which is documented as a limitation rather
    * than guessed at.
    */
-  scanFunction(fn: ScannedFunction): Vulnerability[] {
+  scanFunction(fn: ScannedFunction, fileCode?: string): Vulnerability[] {
     const clean = sanitizeKeepLines(fn.body);
     const brace = clean.indexOf("{");
     const body = brace >= 0 ? clean.slice(brace) : clean;
@@ -48,7 +48,14 @@ export class MissingRequireAuthPlugin implements Rule, FunctionRule {
       return [];
     }
 
-    const auth = AUTH_CHECK.exec(body);
+    // A local macro_rules! whose body calls require_auth is an auth check
+    // wherever it is invoked.
+    const macros = fileCode === undefined ? [] : macrosContaining(fileCode, AUTH_CHECK);
+    const authPattern =
+      macros.length === 0
+        ? AUTH_CHECK
+        : new RegExp(`${AUTH_CHECK.source}|\\b(?:${macros.join("|")})\\s*!\\s*[(\\[{]`);
+    const auth = authPattern.exec(body);
     if (auth && auth.index < sensitive.index) {
       return [];
     }

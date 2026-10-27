@@ -9,8 +9,12 @@ import { extractRustFunctionsAst } from "./parser/rust.js";
  * source-text scan), so the tree is parsed once per file, not once per rule.
  */
 export interface FunctionRule {
-  /** Scans one function; receives the boundaries and body of its declaration. */
-  scanFunction(fn: ScannedFunction): Vulnerability[];
+  /**
+   * Scans one function; receives the boundaries and body of its declaration
+   * and, when known, the whole file's source for file-level context such as
+   * locally defined macros.
+   */
+  scanFunction(fn: ScannedFunction, fileCode?: string): Vulnerability[];
 }
 
 export function isFunctionRule(rule: Rule): rule is Rule & FunctionRule {
@@ -94,7 +98,7 @@ function runFunctionRule(
   }
   const findings: Vulnerability[] = [];
   for (const fn of astFunctions) {
-    findings.push(...rule.scanFunction(fn).map((finding) => stampRuleId(rule, finding)));
+    findings.push(...rule.scanFunction(fn, code).map((finding) => stampRuleId(rule, finding)));
   }
   return findings;
 }
